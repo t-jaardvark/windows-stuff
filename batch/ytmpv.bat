@@ -48,6 +48,7 @@ if "%~1"=="" (
 :: Validate that we have a URL
 if "%video_url%"=="" (
     echo No URL provided. Exiting.
+    pause
     exit /b 1
 )
 
@@ -56,12 +57,10 @@ if not "%SAVE_PATH%"=="" (
     :: Use the specified save path
     if not exist "%SAVE_PATH%" mkdir "%SAVE_PATH%" 2>nul
     set "download_dir=%SAVE_PATH%"
-    set "delete_after=0"
 ) else (
     :: Use a temporary directory
     set "download_dir=%TEMP%\yt_download_%RANDOM%"
     mkdir "%download_dir%" 2>nul
-    set "delete_after=1"
 )
 
 :: Change to the download directory
@@ -73,10 +72,10 @@ echo Saving to: %download_dir%
 
 :: Download with quality setting if specified, otherwise best quality
 if defined quality_param (
-    yt-dlp %quality_param% -o "%%(title)s.%%(ext)s" "%video_url%"
+    yt-dlp %quality_param% -o "video.%%(ext)s" "%video_url%"
 ) else (
     echo Downloading best available quality
-    yt-dlp -o "%%(title)s.%%(ext)s" "%video_url%"
+    yt-dlp -o "video.%%(ext)s" "%video_url%"
 )
 
 :: Find the downloaded file (should be the newest file in the directory)
@@ -93,9 +92,9 @@ if not defined video_file (
     exit /b 1
 )
 
-:: Start mpv in a detached process
+:: Start mpv in a detached process with the full path to the video file
 echo Starting video playback of: %video_file%
 start "" mpv "%download_dir%\%video_file%"
 
 :: Exit the batch file
-exit
+exit /b 0
