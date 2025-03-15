@@ -48,59 +48,75 @@ if "%~1"=="" (
 :: Validate that we have a URL
 if "%video_url%"=="" (
     echo No URL provided. Exiting.
-    exit /b 1
-)
-
-:: Determine where to save the video
-if not "%SAVE_PATH%"=="" (
-    :: Use the specified save path
-    if not exist "%SAVE_PATH%" mkdir "%SAVE_PATH%" 2>nul
-    set "download_dir=%SAVE_PATH%"
-) else (
-    :: Use a temporary directory
-    set "download_dir=%TEMP%\yt_download_%RANDOM%"
-    if not exist "%download_dir%" mkdir "%download_dir%" 2>nul
-)
-
-:: Verify the directory was created successfully
-if not exist "%download_dir%" (
-    echo Error: Failed to create download directory.
     pause
     exit /b 1
+)
+
+:: Create a download directory
+if not "%SAVE_PATH%"=="" (
+    :: Use the specified save path
+    set "download_dir=%SAVE_PATH%"
+) else (
+    :: Use the current directory as fallback
+    set "download_dir=%CD%\yt_download_%RANDOM%"
+)
+
+:: Try to create the directory if it doesn't exist
+if not exist "%download_dir%" (
+    echo Creating directory: %download_dir%
+    mkdir "%download_dir%" 2>nul
+    if errorlevel 1 (
+        echo Error: Failed to create download directory.
+        echo Using current directory instead.
+        set "download_dir=%CD%"
+    )
 )
 
 :: Change to the download directory
-cd /d "%download_dir%" || (
-    echo Error: Failed to change to download directory.
-    pause
-    exit /b 1
+cd /d "%download_dir%" 2>nul
+if errorlevel 1 (
+    echo Error: Cannot access download directory.
+    echo Using current directory instead.
+    set "download_dir=%CD%"
+    cd /d "%download_dir%"
 )
 
 :: Download the video using yt-dlp
 echo Downloading video from: %video_url%
 echo Saving to: %download_dir%
 
-:: Set a specific output filename to avoid issues
-set "output_filename=downloaded_video.mp4"
-
 :: Download with quality setting if specified, otherwise best quality
 if defined quality_param (
-    yt-dlp %quality_param% -o "%output_filename%" "%video_url%"
+    yt-dlp %quality_param% -o "video.%%(ext)s" "%video_url%"
 ) else (
     echo Downloading best available quality
-    yt-dlp -o "%output_filename%" "%video_url%"
+    yt-dlp -o "video.%%(ext)s" "%video_url%"
 )
 
-:: Check if download was successful
-if not exist "%output_filename%" (
-    echo Download failed! File not found.
+if errorlevel 1 (
+    echo Error: Download failed.
     pause
     exit /b 1
 )
 
-:: Start mpv in a detached process with full path
-echo Starting video playback of: %output_filename%
-start "" mpv "%download_dir%\%output_filename%"
+:: Find the downloaded file
+set "video_file="
+for /f "delims=" %%i in ('dir /b /a-d /o-d') do (
+    set "video_file=%%i"
+    goto :found_file
+)
+
+:found_file
+:: Check if download was successful
+if not defined video_file (
+    echo Error: No video file found after download.
+    pause
+    exit /b 1
+)
+
+:: Start mpv in a detached process
+echo Starting video playback of: %video_file%
+start "" mpv "%download_dir%\%video_file%"
 
 :: Exit the batch file
-exit
+exit /b 0
